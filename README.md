@@ -1,0 +1,1 @@
+# TinyEditor, the editor for Tinyworlds!
