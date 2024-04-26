@@ -4,7 +4,12 @@ project(tinyeditor)
 
 include_directories(include)
 
+add_subdirectory(3rdparty/raylib)
+add_subdirectory(3rdparty/raylib-nuklear)
+
 set(SRC_FILES   
     "src/main.c")
 
 add_executable(tinyeditor ${SRC_FILES})
+
+target_link_libraries(tinyeditor raylib raylib_nuklear)
