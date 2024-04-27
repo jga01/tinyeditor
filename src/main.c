@@ -17,9 +17,9 @@ void tiny_panel_update(TinyPanel *panel, Matrix transform)
 {
     panel->position = (Vector3){transform.m12, transform.m13, transform.m14};
 
-    panel->rotation = (Vector3){atan2(transform.m6, transform.m10),
-                                atan2(-transform.m2, sqrt(transform.m6 * transform.m6 + transform.m10 * transform.m10)),
-                                atan2(transform.m1, transform.m0)};
+    panel->rotation = (Vector3){atan2(transform.m6, transform.m10) * 180.0/PI,
+                                atan2(-transform.m2, sqrt(transform.m6 * transform.m6 + transform.m10 * transform.m10)) * 180.0/PI,
+                                atan2(transform.m1, transform.m0) * 180.0/PI};
 }
 
 Matrix tiny_get_transform(TinyPanel panel, Vector3 prev_rotation, Vector3 position)
@@ -29,7 +29,7 @@ Matrix tiny_get_transform(TinyPanel panel, Vector3 prev_rotation, Vector3 positi
             return MatrixMultiply(
                 MatrixMultiply(
                     MatrixTranslate(-position.x, -position.y, -position.z),
-                    MatrixRotate(X_AXIS, panel.rotation.x - prev_rotation.x)),
+                    MatrixRotate(X_AXIS, (panel.rotation.x - prev_rotation.x) * PI/180.0)),
                 MatrixTranslate(position.x, position.y, position.z));
         }
         else if ((panel.rotation.y - prev_rotation.y) != 0.0f)
@@ -37,7 +37,7 @@ Matrix tiny_get_transform(TinyPanel panel, Vector3 prev_rotation, Vector3 positi
             return MatrixMultiply(
                 MatrixMultiply(
                     MatrixTranslate(-position.x, -position.y, -position.z),
-                    MatrixRotate(Y_AXIS, panel.rotation.y - prev_rotation.y)),
+                    MatrixRotate(Y_AXIS, (panel.rotation.y - prev_rotation.y) * PI/180.0)),
                 MatrixTranslate(position.x, position.y, position.z));
         }
         else if ((panel.rotation.z - prev_rotation.z) != 0.0f)
@@ -45,7 +45,7 @@ Matrix tiny_get_transform(TinyPanel panel, Vector3 prev_rotation, Vector3 positi
             return MatrixMultiply(
                 MatrixMultiply(
                     MatrixTranslate(-position.x, -position.y, -position.z),
-                    MatrixRotate(Z_AXIS, panel.rotation.z - prev_rotation.z)),
+                    MatrixRotate(Z_AXIS, (panel.rotation.z - prev_rotation.z) * PI/180.0)),
                 MatrixTranslate(position.x, position.y, position.z));
         }
 
@@ -101,8 +101,8 @@ int main(int argc, char *argv[])
     int fontSize = 10;
     struct nk_context *ctx = InitNuklear(fontSize);
 
-    const float minimum_float = -10.0f;
-    const float maximum_float = 10.0f;
+    const float linear_limit = 99999.9f;
+    const float angle_limit = 180.0f;
 
     while (!WindowShouldClose())
     {
@@ -119,17 +119,17 @@ int main(int argc, char *argv[])
             {
                 nk_layout_row_dynamic(ctx, 20, 1);
                 nk_label(ctx, "Location", NK_TEXT_LEFT);
-                nk_property_float(ctx, "#X:", minimum_float, &panel.position.x, maximum_float, 1.0f, 1.0f);
-                nk_property_float(ctx, "#Y:", minimum_float, &panel.position.y, maximum_float, 1.0f, 1.0f);
-                nk_property_float(ctx, "#Z:", minimum_float, &panel.position.z, maximum_float, 1.0f, 1.0f);
+                nk_property_float(ctx, "#X:", -linear_limit, &panel.position.x, linear_limit, 1.0f, 1.0f);
+                nk_property_float(ctx, "#Y:", -linear_limit, &panel.position.y, linear_limit, 1.0f, 1.0f);
+                nk_property_float(ctx, "#Z:", -linear_limit, &panel.position.z, linear_limit, 1.0f, 1.0f);
                 nk_label(ctx, "Rotation", NK_TEXT_LEFT);
-                nk_property_float(ctx, "#X:", -3.14f, &panel.rotation.x, 3.14f, 0.1f, 0.1f);
-                nk_property_float(ctx, "#Y:", -3.14f, &panel.rotation.y, 3.14f, 0.1f, 0.1f);
-                nk_property_float(ctx, "#Z:", -3.14f, &panel.rotation.z, 3.14f, 0.1f, 0.1f);
+                nk_property_float(ctx, "#X:", -angle_limit, &panel.rotation.x, angle_limit, 0.1f, 0.1f);
+                nk_property_float(ctx, "#Y:", -angle_limit, &panel.rotation.y, angle_limit, 0.1f, 0.1f);
+                nk_property_float(ctx, "#Z:", -angle_limit, &panel.rotation.z, angle_limit, 0.1f, 0.1f);
                 nk_label(ctx, "Scale", NK_TEXT_LEFT);
-                nk_property_float(ctx, "#X:", minimum_float, &panel.size.x, maximum_float, 1.0f, 1.0f);
-                nk_property_float(ctx, "#Y:", minimum_float, &panel.size.y, maximum_float, 1.0f, 1.0f);
-                nk_property_float(ctx, "#Z:", minimum_float, &panel.size.z, maximum_float, 1.0f, 1.0f);
+                nk_property_float(ctx, "#X:", -linear_limit, &panel.size.x, linear_limit, 1.0f, 1.0f);
+                nk_property_float(ctx, "#Y:", -linear_limit, &panel.size.y, linear_limit, 1.0f, 1.0f);
+                nk_property_float(ctx, "#Z:", -linear_limit, &panel.size.z, linear_limit, 1.0f, 1.0f);
 
                 nk_tree_pop(ctx);
             }
@@ -156,11 +156,11 @@ int main(int argc, char *argv[])
 
         DrawModelEx(model, defaultModelPosition, defaultModelRotation, 0.0f, defaultModelSize, GRAY);
 
-        DrawGrid(100, 1.0f);
-
-        rgizmo_draw(gizmo, camera, position);
+        DrawGrid(100, 5.0f);
 
         EndMode3D();
+
+        rgizmo_draw(gizmo, camera, position);
 
         /* Render the Nuklear GUI */
         DrawNuklear(ctx);
