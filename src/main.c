@@ -17,39 +17,41 @@ void tiny_panel_update(TinyPanel *panel, Matrix transform)
 {
     panel->position = (Vector3){transform.m12, transform.m13, transform.m14};
 
-    panel->rotation = (Vector3){atan2(transform.m6, transform.m10) * 180.0/PI,
-                                atan2(-transform.m2, sqrt(transform.m6 * transform.m6 + transform.m10 * transform.m10)) * 180.0/PI,
-                                atan2(transform.m1, transform.m0) * 180.0/PI};
+    panel->rotation = (Vector3){atan2(transform.m6, transform.m10) * 180.0 / PI,
+                                atan2(-transform.m2, sqrt(transform.m6 * transform.m6 + transform.m10 * transform.m10)) * 180.0 / PI,
+                                atan2(transform.m1, transform.m0) * 180.0 / PI};
 }
 
-Matrix tiny_get_transform(TinyPanel panel, Vector3 prev_rotation, Vector3 position)
+Matrix tiny_get_transform(TinyPanel panel, Vector3 prev_rotation, Vector3 prev_size, Vector3 position)
 {
-        if ((panel.rotation.x - prev_rotation.x) != 0.0f)
-        {
-            return MatrixMultiply(
-                MatrixMultiply(
-                    MatrixTranslate(-position.x, -position.y, -position.z),
-                    MatrixRotate(X_AXIS, (panel.rotation.x - prev_rotation.x) * PI/180.0)),
-                MatrixTranslate(position.x, position.y, position.z));
-        }
-        else if ((panel.rotation.y - prev_rotation.y) != 0.0f)
-        {
-            return MatrixMultiply(
-                MatrixMultiply(
-                    MatrixTranslate(-position.x, -position.y, -position.z),
-                    MatrixRotate(Y_AXIS, (panel.rotation.y - prev_rotation.y) * PI/180.0)),
-                MatrixTranslate(position.x, position.y, position.z));
-        }
-        else if ((panel.rotation.z - prev_rotation.z) != 0.0f)
-        {
-            return MatrixMultiply(
-                MatrixMultiply(
-                    MatrixTranslate(-position.x, -position.y, -position.z),
-                    MatrixRotate(Z_AXIS, (panel.rotation.z - prev_rotation.z) * PI/180.0)),
-                MatrixTranslate(position.x, position.y, position.z));
-        }
+    Matrix transform = MatrixIdentity();
 
-    return MatrixIdentity();
+    if ((panel.rotation.x - prev_rotation.x) != 0.0f)
+    {
+        transform = MatrixMultiply(
+            MatrixMultiply(
+                MatrixTranslate(-position.x, -position.y, -position.z),
+                MatrixRotate(X_AXIS, (panel.rotation.x - prev_rotation.x) * PI / 180.0)),
+            MatrixTranslate(position.x, position.y, position.z));
+    }
+    else if ((panel.rotation.y - prev_rotation.y) != 0.0f)
+    {
+        transform = MatrixMultiply(
+            MatrixMultiply(
+                MatrixTranslate(-position.x, -position.y, -position.z),
+                MatrixRotate(Y_AXIS, (panel.rotation.y - prev_rotation.y) * PI / 180.0)),
+            MatrixTranslate(position.x, position.y, position.z));
+    }
+    else if ((panel.rotation.z - prev_rotation.z) != 0.0f)
+    {
+        transform = MatrixMultiply(
+            MatrixMultiply(
+                MatrixTranslate(-position.x, -position.y, -position.z),
+                MatrixRotate(Z_AXIS, (panel.rotation.z - prev_rotation.z) * PI / 180.0)),
+            MatrixTranslate(position.x, position.y, position.z));
+    }
+
+    return transform;
 }
 
 int main(int argc, char *argv[])
@@ -111,6 +113,7 @@ int main(int argc, char *argv[])
 
         tiny_panel_update(&panel, model.transform);
         Vector3 prev_rotation = panel.rotation;
+        Vector3 prev_size = panel.size;
 
         if (nk_begin(ctx, "Panel", nk_rect(10, 10, 220, 440),
                      NK_WINDOW_BORDER | NK_WINDOW_CLOSABLE))
@@ -136,12 +139,28 @@ int main(int argc, char *argv[])
         }
         nk_end(ctx);
 
+        model.transform.m0 /= prev_size.x;
+        model.transform.m4 /= prev_size.x;
+        model.transform.m8 /= prev_size.x;
+        model.transform.m1 /= prev_size.y;
+        model.transform.m5 /= prev_size.y;
+        model.transform.m9 /= prev_size.y;
+        model.transform.m2 /= prev_size.z;
+        model.transform.m6 /= prev_size.z;
+        model.transform.m10 /= prev_size.z;
+
+        if (panel.size.x == 0.0) panel.size.x += 0.1;
+        if (panel.size.y == 0.0) panel.size.y += 0.1;
+        if (panel.size.z == 0.0) panel.size.z += 0.1;
+
+        model.transform = MatrixMultiply(model.transform, MatrixScale(panel.size.x, panel.size.y, panel.size.z));
+
         model.transform.m12 = panel.position.x;
         model.transform.m13 = panel.position.y;
         model.transform.m14 = panel.position.z;
 
         position = (Vector3){model.transform.m12, model.transform.m13, model.transform.m14};
-        model.transform = MatrixMultiply(model.transform, tiny_get_transform(panel, prev_rotation, position));
+        model.transform = MatrixMultiply(model.transform, tiny_get_transform(panel, prev_rotation, prev_size, position));
 
         position = (Vector3){model.transform.m12, model.transform.m13, model.transform.m14};
         rgizmo_update(&gizmo, camera, position);
