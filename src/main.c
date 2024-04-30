@@ -63,9 +63,9 @@ void tiny_panel_update(struct nk_context *ctx, TinyPanel *panel, Matrix transfor
             nk_property_float(ctx, "#Y:", -linear_limit, &panel->translation.y, linear_limit, 1.0f, 1.0f);
             nk_property_float(ctx, "#Z:", -linear_limit, &panel->translation.z, linear_limit, 1.0f, 1.0f);
             nk_label(ctx, "Rotation", NK_TEXT_LEFT);
-            nk_property_float(ctx, "#X:", -angle_limit, &panel->rotation.x, angle_limit, 0.1f, 0.1f);
-            nk_property_float(ctx, "#Y:", -angle_limit, &panel->rotation.y, angle_limit, 0.1f, 0.1f);
-            nk_property_float(ctx, "#Z:", -angle_limit, &panel->rotation.z, angle_limit, 0.1f, 0.1f);
+            nk_property_float(ctx, "#X:", -angle_limit, &panel->rotation.x, angle_limit, 1.0f, 1.0f);
+            nk_property_float(ctx, "#Y:", -angle_limit, &panel->rotation.y, angle_limit, 1.0f, 1.0f);
+            nk_property_float(ctx, "#Z:", -angle_limit, &panel->rotation.z, angle_limit, 1.0f, 1.0f);
             nk_label(ctx, "Scale", NK_TEXT_LEFT);
             nk_property_float(ctx, "#X:", -linear_limit, &panel->scale.x, linear_limit, 1.0f, 1.0f);
             nk_property_float(ctx, "#Y:", -linear_limit, &panel->scale.y, linear_limit, 1.0f, 1.0f);
@@ -76,43 +76,34 @@ void tiny_panel_update(struct nk_context *ctx, TinyPanel *panel, Matrix transfor
     }
     nk_end(ctx);
 
-    // printf("panel.scale: %f prev_scale: %f\n", panel->scale.x, prev_scale.x);
-
     panel->update.scale = Vector3Subtract(panel->scale, prev_scale);
     panel->update.rotation = Vector3Subtract(panel->rotation, prev_rotation);
     panel->update.translation = Vector3Subtract(panel->translation, prev_translation);
 }
 
-Matrix tiny_get_transform(TinyPanel panel, Vector3 position)
+Matrix tiny_get_transform(TinyPanel panel, Matrix modelTransform)
 {
     Matrix matScale = MatrixIdentity();
     Matrix matRotation = MatrixIdentity();
     Matrix matTranslation = MatrixIdentity();
-    Matrix transform = MatrixIdentity();
+    Matrix matTransform = MatrixIdentity();
 
-    if (!Vector3Equals(panel.update.scale, (Vector3){0.0, 0.0, 0.0}))
+    if (!Vector3Equals(panel.update.scale, (Vector3){0.0, 0.0, 0.0}) ||
+        !Vector3Equals(panel.update.rotation, (Vector3){0.0, 0.0, 0.0}) ||
+        !Vector3Equals(panel.update.translation, (Vector3){0.0, 0.0, 0.0}))
     {
-        matScale = MatrixMultiply(MatrixMultiply(MatrixTranslate(-position.x, -position.y, -position.z),
-                                                 MatrixMultiply(
-                                                     MatrixScale(1.0 / panel.scale.x, 1.0 / panel.scale.y, 1.0 / panel.scale.z),
-                                                     MatrixScale(panel.scale.x + panel.update.scale.x, panel.scale.y + panel.update.scale.y, panel.scale.z + panel.update.scale.z))),
-                                  MatrixTranslate(position.x, position.y, position.z));
+        matScale = MatrixScale(panel.scale.x + panel.update.scale.x, panel.scale.y + panel.update.scale.y, panel.scale.z + panel.update.scale.z);
+        matRotation = MatrixRotateXYZ(Vector3Add(panel.rotation, panel.update.rotation));
+        matTranslation = MatrixTranslate(panel.translation.x + panel.update.translation.x,
+                                         panel.translation.y + panel.update.translation.y,
+                                         panel.translation.z + panel.update.translation.z);
+
+        matTransform = MatrixMultiply(MatrixMultiply(matScale, matRotation), matTranslation);
+
+        return matTransform;
     }
-
-    if (!Vector3Equals(panel.update.rotation, (Vector3){0.0, 0.0, 0.0}))
-        matRotation = MatrixMultiply(
-            MatrixMultiply(
-                MatrixTranslate(-position.x, -position.y, -position.z),
-                MatrixRotateXYZ(panel.update.rotation)),
-            MatrixTranslate(position.x, position.y, position.z));
-
-    if (!Vector3Equals(panel.update.translation, (Vector3){0.0, 0.0, 0.0}))
-        // matTranslation = MatrixMultiply(MatrixTranslate(-position.x, -position.y, -position.z), MatrixTranslate(panel.translation.x, panel.translation.y, panel.translation.z));
-        matTranslation = MatrixTranslate(panel.update.translation.x, panel.update.translation.y, panel.update.translation.z);
-
-    transform = MatrixMultiply(MatrixMultiply(matScale, matRotation), matTranslation);
-
-    return transform;
+    else
+        return modelTransform;
 }
 
 int main(int argc, char *argv[])
@@ -171,7 +162,7 @@ int main(int argc, char *argv[])
 
         position = (Vector3){model.transform.m12, model.transform.m13, model.transform.m14};
         tiny_panel_update(ctx, &panel, model.transform);
-        model.transform = MatrixMultiply(model.transform, tiny_get_transform(panel, position));
+        model.transform = tiny_get_transform(panel, model.transform);
 
         position = (Vector3){model.transform.m12, model.transform.m13, model.transform.m14};
         rgizmo_update(&gizmo, camera, position);
