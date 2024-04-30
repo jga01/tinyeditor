@@ -52,29 +52,24 @@ void tiny_panel_update(struct nk_context *ctx, TinyPanel *panel, Matrix transfor
     panel->rotation = prev_rotation;
     panel->translation = prev_translation;
 
-    if (nk_begin(ctx, "Panel", nk_rect(10, 10, 220, 440),
-                 NK_WINDOW_BORDER | NK_WINDOW_CLOSABLE))
+    if (nk_tree_push(ctx, NK_TREE_NODE, "Transform", NK_MINIMIZED))
     {
-        if (nk_tree_push(ctx, NK_TREE_NODE, "Transform", NK_MINIMIZED))
-        {
-            nk_layout_row_dynamic(ctx, 20, 1);
-            nk_label(ctx, "Location", NK_TEXT_LEFT);
-            nk_property_float(ctx, "#X:", -linear_limit, &panel->translation.x, linear_limit, 1.0f, 1.0f);
-            nk_property_float(ctx, "#Y:", -linear_limit, &panel->translation.y, linear_limit, 1.0f, 1.0f);
-            nk_property_float(ctx, "#Z:", -linear_limit, &panel->translation.z, linear_limit, 1.0f, 1.0f);
-            nk_label(ctx, "Rotation", NK_TEXT_LEFT);
-            nk_property_float(ctx, "#X:", -angle_limit, &panel->rotation.x, angle_limit, 1.0f, 1.0f);
-            nk_property_float(ctx, "#Y:", -angle_limit, &panel->rotation.y, angle_limit, 1.0f, 1.0f);
-            nk_property_float(ctx, "#Z:", -angle_limit, &panel->rotation.z, angle_limit, 1.0f, 1.0f);
-            nk_label(ctx, "Scale", NK_TEXT_LEFT);
-            nk_property_float(ctx, "#X:", -linear_limit, &panel->scale.x, linear_limit, 1.0f, 1.0f);
-            nk_property_float(ctx, "#Y:", -linear_limit, &panel->scale.y, linear_limit, 1.0f, 1.0f);
-            nk_property_float(ctx, "#Z:", -linear_limit, &panel->scale.z, linear_limit, 1.0f, 1.0f);
+        nk_layout_row_dynamic(ctx, 20, 1);
+        nk_label(ctx, "Location", NK_TEXT_LEFT);
+        nk_property_float(ctx, "#X:", -linear_limit, &panel->translation.x, linear_limit, 1.0f, 1.0f);
+        nk_property_float(ctx, "#Y:", -linear_limit, &panel->translation.y, linear_limit, 1.0f, 1.0f);
+        nk_property_float(ctx, "#Z:", -linear_limit, &panel->translation.z, linear_limit, 1.0f, 1.0f);
+        nk_label(ctx, "Rotation", NK_TEXT_LEFT);
+        nk_property_float(ctx, "#X:", -angle_limit, &panel->rotation.x, angle_limit, 1.0f, 1.0f);
+        nk_property_float(ctx, "#Y:", -angle_limit, &panel->rotation.y, angle_limit, 1.0f, 1.0f);
+        nk_property_float(ctx, "#Z:", -angle_limit, &panel->rotation.z, angle_limit, 1.0f, 1.0f);
+        nk_label(ctx, "Scale", NK_TEXT_LEFT);
+        nk_property_float(ctx, "#X:", -linear_limit, &panel->scale.x, linear_limit, 1.0f, 1.0f);
+        nk_property_float(ctx, "#Y:", -linear_limit, &panel->scale.y, linear_limit, 1.0f, 1.0f);
+        nk_property_float(ctx, "#Z:", -linear_limit, &panel->scale.z, linear_limit, 1.0f, 1.0f);
 
-            nk_tree_pop(ctx);
-        }
+        nk_tree_pop(ctx);
     }
-    nk_end(ctx);
 
     panel->update.scale = Vector3Subtract(panel->scale, prev_scale);
     panel->update.rotation = Vector3Subtract(panel->rotation, prev_rotation);
@@ -92,11 +87,11 @@ Matrix tiny_get_transform(TinyPanel panel, Matrix modelTransform)
         !Vector3Equals(panel.update.rotation, (Vector3){0.0, 0.0, 0.0}) ||
         !Vector3Equals(panel.update.translation, (Vector3){0.0, 0.0, 0.0}))
     {
-        matScale = MatrixScale(panel.scale.x + panel.update.scale.x, panel.scale.y + panel.update.scale.y, panel.scale.z + panel.update.scale.z);
-        matRotation = MatrixRotateXYZ(Vector3Add(panel.rotation, panel.update.rotation));
-        matTranslation = MatrixTranslate(panel.translation.x + panel.update.translation.x,
-                                         panel.translation.y + panel.update.translation.y,
-                                         panel.translation.z + panel.update.translation.z);
+        matScale = MatrixScale(panel.scale.x, panel.scale.y, panel.scale.z);
+        matRotation = MatrixRotateXYZ(panel.rotation);
+        matTranslation = MatrixTranslate(panel.translation.x,
+                                         panel.translation.y,
+                                         panel.translation.z);
 
         matTransform = MatrixMultiply(MatrixMultiply(matScale, matRotation), matTranslation);
 
@@ -132,7 +127,12 @@ int main(int argc, char *argv[])
     Vector3 defaultModelRotation = {0.0f, 0.0f, 0.0f};
     Vector3 defaultModelSize = {1.0f, 1.0f, 1.0f};
 
-    Model model = LoadModelFromMesh(GenMeshCube(defaultModelSize.x, defaultModelSize.y, defaultModelSize.z));
+    const int MAX_MODELS = 100;
+    Model models[MAX_MODELS];
+    models[0] = LoadModelFromMesh(GenMeshCube(defaultModelSize.x, defaultModelSize.y, defaultModelSize.z));
+    int SELECTED_MODEL = 0;
+    int MODELS = 1;
+
     RGizmo gizmo = rgizmo_create();
 
     Vector3 position = {0};
@@ -160,13 +160,53 @@ int main(int argc, char *argv[])
         /* Update the Nuklear context, along with input */
         UpdateNuklear(ctx);
 
-        position = (Vector3){model.transform.m12, model.transform.m13, model.transform.m14};
-        tiny_panel_update(ctx, &panel, model.transform);
-        model.transform = tiny_get_transform(panel, model.transform);
+        if (nk_begin(ctx, "Panel", nk_rect(10, 10, 220, 440),
+                     NK_WINDOW_BORDER | NK_WINDOW_CLOSABLE))
+        {
+            nk_layout_row_dynamic(ctx, 10, 1);
 
-        position = (Vector3){model.transform.m12, model.transform.m13, model.transform.m14};
+            position = (Vector3){models[SELECTED_MODEL].transform.m12, models[SELECTED_MODEL].transform.m13, models[SELECTED_MODEL].transform.m14};
+            tiny_panel_update(ctx, &panel, models[SELECTED_MODEL].transform);
+            models[SELECTED_MODEL].transform = tiny_get_transform(panel, models[SELECTED_MODEL].transform);
+
+            if (nk_button_label(ctx, "Add Cube"))
+            {
+                Mesh mesh = GenMeshCube(defaultModelSize.x, defaultModelSize.x, defaultModelSize.x);
+                Model model = LoadModelFromMesh(mesh);
+                models[MODELS] = model;
+                MODELS++;
+                SELECTED_MODEL = MODELS - 1;
+            }
+            if (nk_button_label(ctx, "Add Sphere"))
+            {
+                Mesh mesh = GenMeshSphere(1.0, 9.0, 9.0);
+                Model model = LoadModelFromMesh(mesh);
+                models[MODELS] = model;
+                MODELS++;
+                SELECTED_MODEL = MODELS - 1;
+            }
+            if (nk_button_label(ctx, "Add Cone"))
+            {
+                Mesh mesh = GenMeshCone(1.0, 1.0, 9.0);
+                Model model = LoadModelFromMesh(mesh);
+                models[MODELS] = model;
+                MODELS++;
+                SELECTED_MODEL = MODELS - 1;
+            }
+            if (nk_button_label(ctx, "Add Cylinder"))
+            {
+                Mesh mesh = GenMeshCylinder(1.0, 1.0, 9.0);
+                Model model = LoadModelFromMesh(mesh);
+                models[MODELS] = model;
+                MODELS++;
+                SELECTED_MODEL = MODELS - 1;
+            }
+        }
+        nk_end(ctx);
+
+        position = (Vector3){models[SELECTED_MODEL].transform.m12, models[SELECTED_MODEL].transform.m13, models[SELECTED_MODEL].transform.m14};
         rgizmo_update(&gizmo, camera, position);
-        model.transform = MatrixMultiply(model.transform, rgizmo_get_transform(gizmo, position));
+        models[SELECTED_MODEL].transform = MatrixMultiply(models[SELECTED_MODEL].transform, rgizmo_get_transform(gizmo, position));
 
         /* Render */
         BeginDrawing();
@@ -175,7 +215,8 @@ int main(int argc, char *argv[])
 
         BeginMode3D(camera);
 
-        DrawModelEx(model, defaultModelPosition, defaultModelRotation, 0.0f, defaultModelSize, GRAY);
+        for (int i = 0; i < MODELS; i++)
+            DrawModelEx(models[i], defaultModelPosition, defaultModelRotation, 0.0f, defaultModelSize, GRAY);
 
         DrawGrid(100, 5.0f);
 
@@ -194,7 +235,8 @@ int main(int argc, char *argv[])
 
     /* De-initialize Raylib stuff */
     rgizmo_unload();
-    UnloadModel(model);
+    for (int i = 0; i < MODELS; i++)
+        UnloadModel(models[i]);
 
     CloseWindow();
     return 0;
