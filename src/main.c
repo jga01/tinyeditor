@@ -3,6 +3,8 @@
 #define RAYLIB_NUKLEAR_IMPLEMENTATION
 #include "raylib-nuklear.h"
 
+#include "rcamera.h"
+
 #define RAYGIZMO_IMPLEMENTATION
 #include "raygizmo.h"
 
@@ -144,6 +146,8 @@ int main(int argc, char *argv[])
 
     Ray ray = {0};
 
+    float sensitivity = 0.01f;
+
     SetTargetFPS(60);
 
     /********************************/
@@ -164,8 +168,20 @@ int main(int argc, char *argv[])
 
     while (!WindowShouldClose())
     {
-        // if (IsCursorHidden())
-        UpdateCamera(&camera, CAMERA_ORBITAL);
+        Vector2 mouseDelta = GetMouseDelta();
+        float mouseWheelMove = GetMouseWheelMove();
+
+        if (IsMouseButtonDown(MOUSE_LEFT_BUTTON) && IsKeyDown(KEY_SPACE))
+        {
+            Matrix rotation_horizontal = MatrixRotate(GetCameraUp(&camera), sensitivity * mouseDelta.x);
+            Matrix rotation_vertical = MatrixRotate(GetCameraRight(&camera), sensitivity * mouseDelta.y);
+            Matrix rotation = MatrixMultiply(rotation_horizontal, rotation_vertical);
+            Vector3 view = Vector3Subtract(camera.position, camera.target);
+            view = Vector3Transform(view, rotation);
+            camera.position = Vector3Add(camera.target, view);
+        }
+
+        camera.position = Vector3Add(camera.position, Vector3Scale(Vector3Subtract(camera.position, camera.target), -mouseWheelMove* 2.0f * sensitivity));
 
         /* Update the Nuklear context, along with input */
         UpdateNuklear(ctx);
