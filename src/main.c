@@ -19,6 +19,13 @@ typedef struct TinyPanel
     } update;
 } TinyPanel;
 
+typedef struct TinyModel
+{
+    Model model;
+    BoundingBox box;
+    RayCollision collision;
+} TinyModel;
+
 void tiny_panel_update(struct nk_context *ctx, TinyPanel *panel, Matrix transform)
 {
     const float linear_limit = 99999.9f;
@@ -103,8 +110,8 @@ Matrix tiny_get_transform(TinyPanel panel, Matrix modelTransform)
 
 int main(int argc, char *argv[])
 {
-    int screen_width = 640;
-    int screen_height = 480;
+    int screen_width = 800;
+    int screen_height = 600;
 
     const unsigned int raylib_flags = FLAG_WINDOW_RESIZABLE;
 
@@ -128,14 +135,17 @@ int main(int argc, char *argv[])
     Vector3 defaultModelSize = {1.0f, 1.0f, 1.0f};
 
     const int MAX_MODELS = 100;
-    Model models[MAX_MODELS];
-    models[0] = LoadModelFromMesh(GenMeshCube(defaultModelSize.x, defaultModelSize.y, defaultModelSize.z));
+    TinyModel models[MAX_MODELS];
+    models[0].model = LoadModelFromMesh(GenMeshCube(defaultModelSize.x, defaultModelSize.y, defaultModelSize.z));
+    models[0].box = GetMeshBoundingBox(models[0].model.meshes[0]);
     int SELECTED_MODEL = 0;
     int MODELS = 1;
 
     RGizmo gizmo = rgizmo_create();
 
     Vector3 position = {0};
+
+    Ray ray = {0};
 
     SetTargetFPS(60);
 
@@ -157,6 +167,9 @@ int main(int argc, char *argv[])
 
     while (!WindowShouldClose())
     {
+        if (IsCursorHidden())
+            UpdateCamera(&camera, CAMERA_FIRST_PERSON);
+
         /* Update the Nuklear context, along with input */
         UpdateNuklear(ctx);
 
@@ -165,15 +178,16 @@ int main(int argc, char *argv[])
         {
             nk_layout_row_dynamic(ctx, 10, 1);
 
-            position = (Vector3){models[SELECTED_MODEL].transform.m12, models[SELECTED_MODEL].transform.m13, models[SELECTED_MODEL].transform.m14};
-            tiny_panel_update(ctx, &panel, models[SELECTED_MODEL].transform);
-            models[SELECTED_MODEL].transform = tiny_get_transform(panel, models[SELECTED_MODEL].transform);
+            position = (Vector3){models[SELECTED_MODEL].model.transform.m12, models[SELECTED_MODEL].model.transform.m13, models[SELECTED_MODEL].model.transform.m14};
+            tiny_panel_update(ctx, &panel, models[SELECTED_MODEL].model.transform);
+            models[SELECTED_MODEL].model.transform = tiny_get_transform(panel, models[SELECTED_MODEL].model.transform);
 
             if (nk_button_label(ctx, "Add Cube"))
             {
                 Mesh mesh = GenMeshCube(defaultModelSize.x, defaultModelSize.x, defaultModelSize.x);
                 Model model = LoadModelFromMesh(mesh);
-                models[MODELS] = model;
+                models[MODELS].model = model;
+                models[MODELS].box = GetMeshBoundingBox(models[0].model.meshes[0]);
                 MODELS++;
                 SELECTED_MODEL = MODELS - 1;
             }
@@ -181,7 +195,8 @@ int main(int argc, char *argv[])
             {
                 Mesh mesh = GenMeshSphere(1.0, 9.0, 9.0);
                 Model model = LoadModelFromMesh(mesh);
-                models[MODELS] = model;
+                models[MODELS].box = GetMeshBoundingBox(models[0].model.meshes[0]);
+                models[MODELS].model = model;
                 MODELS++;
                 SELECTED_MODEL = MODELS - 1;
             }
@@ -189,7 +204,8 @@ int main(int argc, char *argv[])
             {
                 Mesh mesh = GenMeshCone(1.0, 1.0, 9.0);
                 Model model = LoadModelFromMesh(mesh);
-                models[MODELS] = model;
+                models[MODELS].box = GetMeshBoundingBox(models[0].model.meshes[0]);
+                models[MODELS].model = model;
                 MODELS++;
                 SELECTED_MODEL = MODELS - 1;
             }
@@ -197,16 +213,37 @@ int main(int argc, char *argv[])
             {
                 Mesh mesh = GenMeshCylinder(1.0, 1.0, 9.0);
                 Model model = LoadModelFromMesh(mesh);
-                models[MODELS] = model;
+                models[MODELS].box = GetMeshBoundingBox(models[0].model.meshes[0]);
+                models[MODELS].model = model;
                 MODELS++;
                 SELECTED_MODEL = MODELS - 1;
             }
         }
         nk_end(ctx);
 
-        position = (Vector3){models[SELECTED_MODEL].transform.m12, models[SELECTED_MODEL].transform.m13, models[SELECTED_MODEL].transform.m14};
+        position = (Vector3){models[SELECTED_MODEL].model.transform.m12, models[SELECTED_MODEL].model.transform.m13, models[SELECTED_MODEL].model.transform.m14};
         rgizmo_update(&gizmo, camera, position);
-        models[SELECTED_MODEL].transform = MatrixMultiply(models[SELECTED_MODEL].transform, rgizmo_get_transform(gizmo, position));
+        models[SELECTED_MODEL].model.transform = MatrixMultiply(models[SELECTED_MODEL].model.transform, rgizmo_get_transform(gizmo, position));
+
+        Vector3 v1 = Vector3Multiply(panel.scale, panel.translation);
+        Vector3 v2 = {v1.x + panel.scale.x, v1.y + panel.scale.y, v1.z + panel.scale.z};
+
+        models[SELECTED_MODEL].box.min = v1;
+        models[SELECTED_MODEL].box.max = v2;
+
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+        {
+            ray = GetScreenToWorldRay(GetMousePosition(), camera);
+            for (int i = 0; i < MODELS; i++)
+            {
+                RayCollision boxHitInfo = GetRayCollisionBox(ray, models[i].box);
+
+                if (boxHitInfo.hit)
+                {
+                    SELECTED_MODEL = i;
+                }
+            }
+        }
 
         /* Render */
         BeginDrawing();
@@ -216,7 +253,9 @@ int main(int argc, char *argv[])
         BeginMode3D(camera);
 
         for (int i = 0; i < MODELS; i++)
-            DrawModelEx(models[i], defaultModelPosition, defaultModelRotation, 0.0f, defaultModelSize, GRAY);
+        {
+            DrawModelEx(models[i].model, defaultModelPosition, defaultModelRotation, 0.0f, defaultModelSize, GRAY);
+        }
 
         DrawGrid(100, 5.0f);
 
@@ -236,7 +275,7 @@ int main(int argc, char *argv[])
     /* De-initialize Raylib stuff */
     rgizmo_unload();
     for (int i = 0; i < MODELS; i++)
-        UnloadModel(models[i]);
+        UnloadModel(models[i].model);
 
     CloseWindow();
     return 0;
