@@ -22,8 +22,6 @@ typedef struct TinyPanel
 typedef struct TinyModel
 {
     Model model;
-    BoundingBox box;
-    RayCollision collision;
 } TinyModel;
 
 void tiny_panel_update(struct nk_context *ctx, TinyPanel *panel, Matrix transform)
@@ -137,7 +135,6 @@ int main(int argc, char *argv[])
     const int MAX_MODELS = 100;
     TinyModel models[MAX_MODELS];
     models[0].model = LoadModelFromMesh(GenMeshCube(defaultModelSize.x, defaultModelSize.y, defaultModelSize.z));
-    models[0].box = GetMeshBoundingBox(models[0].model.meshes[0]);
     int SELECTED_MODEL = 0;
     int MODELS = 1;
 
@@ -167,8 +164,8 @@ int main(int argc, char *argv[])
 
     while (!WindowShouldClose())
     {
-        if (IsCursorHidden())
-            UpdateCamera(&camera, CAMERA_FIRST_PERSON);
+        // if (IsCursorHidden())
+        UpdateCamera(&camera, CAMERA_ORBITAL);
 
         /* Update the Nuklear context, along with input */
         UpdateNuklear(ctx);
@@ -187,7 +184,6 @@ int main(int argc, char *argv[])
                 Mesh mesh = GenMeshCube(defaultModelSize.x, defaultModelSize.x, defaultModelSize.x);
                 Model model = LoadModelFromMesh(mesh);
                 models[MODELS].model = model;
-                models[MODELS].box = GetMeshBoundingBox(models[0].model.meshes[0]);
                 MODELS++;
                 SELECTED_MODEL = MODELS - 1;
             }
@@ -195,7 +191,6 @@ int main(int argc, char *argv[])
             {
                 Mesh mesh = GenMeshSphere(1.0, 9.0, 9.0);
                 Model model = LoadModelFromMesh(mesh);
-                models[MODELS].box = GetMeshBoundingBox(models[0].model.meshes[0]);
                 models[MODELS].model = model;
                 MODELS++;
                 SELECTED_MODEL = MODELS - 1;
@@ -204,7 +199,6 @@ int main(int argc, char *argv[])
             {
                 Mesh mesh = GenMeshCone(1.0, 1.0, 9.0);
                 Model model = LoadModelFromMesh(mesh);
-                models[MODELS].box = GetMeshBoundingBox(models[0].model.meshes[0]);
                 models[MODELS].model = model;
                 MODELS++;
                 SELECTED_MODEL = MODELS - 1;
@@ -213,7 +207,6 @@ int main(int argc, char *argv[])
             {
                 Mesh mesh = GenMeshCylinder(1.0, 1.0, 9.0);
                 Model model = LoadModelFromMesh(mesh);
-                models[MODELS].box = GetMeshBoundingBox(models[0].model.meshes[0]);
                 models[MODELS].model = model;
                 MODELS++;
                 SELECTED_MODEL = MODELS - 1;
@@ -225,18 +218,12 @@ int main(int argc, char *argv[])
         rgizmo_update(&gizmo, camera, position);
         models[SELECTED_MODEL].model.transform = MatrixMultiply(models[SELECTED_MODEL].model.transform, rgizmo_get_transform(gizmo, position));
 
-        Vector3 v1 = Vector3Multiply(panel.scale, panel.translation);
-        Vector3 v2 = {v1.x + panel.scale.x, v1.y + panel.scale.y, v1.z + panel.scale.z};
-
-        models[SELECTED_MODEL].box.min = v1;
-        models[SELECTED_MODEL].box.max = v2;
-
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
         {
             ray = GetScreenToWorldRay(GetMousePosition(), camera);
             for (int i = 0; i < MODELS; i++)
             {
-                RayCollision boxHitInfo = GetRayCollisionBox(ray, models[i].box);
+                RayCollision boxHitInfo = GetRayCollisionMesh(ray, models[i].model.meshes[0], models[i].model.transform);
 
                 if (boxHitInfo.hit)
                 {
