@@ -167,6 +167,7 @@ int main(int argc, char *argv[])
     /********************************/
     TinyPanel panel = {.translation = defaultModelPosition, .scale = defaultModelSize, .rotation = defaultModelRotation, .update = {0}};
     nk_bool selected[MAX_TEXTURES];
+    nk_bool drawGizmo = true;
 
     /********************************/
     /*                              */
@@ -206,6 +207,22 @@ int main(int argc, char *argv[])
             tiny_panel_update(ctx, &panel, models[SELECTED_MODEL].model.transform);
             models[SELECTED_MODEL].model.transform = tiny_get_transform(panel, models[SELECTED_MODEL].model.transform);
 
+            if (nk_button_label(ctx, "Delete Model"))
+            {
+                if (MODELS)
+                {
+                    UnloadModel(models[SELECTED_MODEL].model);
+                    for (int i = SELECTED_MODEL; i < MODELS - 1; i++)
+                    {
+                        models[i] = models[i + 1];
+                    }
+                    MODELS--;
+                    if (MODELS == 0)
+                        drawGizmo = false;
+                    SELECTED_MODEL = 0;
+                }
+            }
+
             if (nk_button_label(ctx, "Add Cube"))
             {
                 Mesh mesh = GenMeshCube(defaultModelSize.x, defaultModelSize.x, defaultModelSize.x);
@@ -213,6 +230,7 @@ int main(int argc, char *argv[])
                 models[MODELS].model = model;
                 MODELS++;
                 SELECTED_MODEL = MODELS - 1;
+                drawGizmo = true;
             }
             if (nk_button_label(ctx, "Add Sphere"))
             {
@@ -221,6 +239,7 @@ int main(int argc, char *argv[])
                 models[MODELS].model = model;
                 MODELS++;
                 SELECTED_MODEL = MODELS - 1;
+                drawGizmo = true;
             }
             if (nk_button_label(ctx, "Add Cone"))
             {
@@ -229,6 +248,7 @@ int main(int argc, char *argv[])
                 models[MODELS].model = model;
                 MODELS++;
                 SELECTED_MODEL = MODELS - 1;
+                drawGizmo = true;
             }
             if (nk_button_label(ctx, "Add Cylinder"))
             {
@@ -237,6 +257,7 @@ int main(int argc, char *argv[])
                 models[MODELS].model = model;
                 MODELS++;
                 SELECTED_MODEL = MODELS - 1;
+                drawGizmo = true;
             }
 
             if (nk_tree_push(ctx, NK_TREE_NODE, "Textures", NK_MINIMIZED))
@@ -289,7 +310,8 @@ int main(int argc, char *argv[])
 
         EndMode3D();
 
-        rgizmo_draw(gizmo, camera, position);
+        if (drawGizmo)
+            rgizmo_draw(gizmo, camera, position);
 
         /* Render the Nuklear GUI */
         DrawNuklear(ctx);
