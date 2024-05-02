@@ -260,18 +260,19 @@ int main(int argc, char *argv[])
                 drawGizmo = true;
             }
 
-            if (nk_tree_push(ctx, NK_TREE_NODE, "Textures", NK_MINIMIZED))
+            nk_layout_row_dynamic(ctx, 30, 1);
+            if (nk_combo_begin_image_label(ctx, "Textures", TextureToNuklear(textures[SELECTED_TEXTURE]), (struct nk_vec2){100, 100}))
             {
-                nk_layout_row_static(ctx, 36, 100, 1);
+                nk_layout_row_dynamic(ctx, 36, 1);
                 for (int i = 0; i < TEXTURES; i++)
                 {
-                    if (nk_selectable_image_label(ctx, TextureToNuklear(textures[i]), " ", NK_TEXT_RIGHT, &selected[i]))
+                    if (nk_combo_item_image_label(ctx, TextureToNuklear(textures[i]), " ", NK_TEXT_CENTERED))
                     {
                         SELECTED_TEXTURE = i;
                         models[SELECTED_MODEL].model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = textures[SELECTED_TEXTURE];
                     }
                 }
-                nk_tree_pop(ctx);
+                nk_combo_end(ctx);
             }
         }
         nk_end(ctx);
