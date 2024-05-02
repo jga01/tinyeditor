@@ -113,7 +113,7 @@ int main(int argc, char *argv[])
     int screen_width = 800;
     int screen_height = 600;
 
-    const unsigned int raylib_flags = FLAG_WINDOW_RESIZABLE;
+    const unsigned int raylib_flags = FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT;
 
     SetConfigFlags(raylib_flags);
     InitWindow(screen_width, screen_height, "TinyEditor");
@@ -140,6 +140,16 @@ int main(int argc, char *argv[])
     int SELECTED_MODEL = 0;
     int MODELS = 1;
 
+    const int MAX_TEXTURES = 100;
+    Texture2D textures[MAX_TEXTURES];
+    textures[0] = LoadTexture("../resources/grass.png");
+    textures[1] = LoadTexture("../resources/lava.png");
+    textures[2] = LoadTexture("../resources/brick.png");
+    textures[3] = LoadTexture("../resources/wood.png");
+    textures[4] = LoadTexture("../resources/stone.png");
+    int SELECTED_TEXTURE = 0;
+    int TEXTURES = 5;
+
     RGizmo gizmo = rgizmo_create();
 
     Vector3 position = {0};
@@ -156,6 +166,7 @@ int main(int argc, char *argv[])
     /*                              */
     /********************************/
     TinyPanel panel = {.translation = defaultModelPosition, .scale = defaultModelSize, .rotation = defaultModelRotation, .update = {0}};
+    nk_bool selected[MAX_TEXTURES];
 
     /********************************/
     /*                              */
@@ -181,7 +192,7 @@ int main(int argc, char *argv[])
             camera.position = Vector3Add(camera.target, view);
         }
 
-        camera.position = Vector3Add(camera.position, Vector3Scale(Vector3Subtract(camera.position, camera.target), -mouseWheelMove* 2.0f * sensitivity));
+        camera.position = Vector3Add(camera.position, Vector3Scale(Vector3Subtract(camera.position, camera.target), -mouseWheelMove * 2.0f * sensitivity));
 
         /* Update the Nuklear context, along with input */
         UpdateNuklear(ctx);
@@ -226,6 +237,20 @@ int main(int argc, char *argv[])
                 models[MODELS].model = model;
                 MODELS++;
                 SELECTED_MODEL = MODELS - 1;
+            }
+
+            if (nk_tree_push(ctx, NK_TREE_NODE, "Textures", NK_MINIMIZED))
+            {
+                nk_layout_row_static(ctx, 36, 100, 1);
+                for (int i = 0; i < TEXTURES; i++)
+                {
+                    if (nk_selectable_image_label(ctx, TextureToNuklear(textures[i]), " ", NK_TEXT_RIGHT, &selected[i]))
+                    {
+                        SELECTED_TEXTURE = i;
+                        models[SELECTED_MODEL].model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = textures[SELECTED_TEXTURE];
+                    }
+                }
+                nk_tree_pop(ctx);
             }
         }
         nk_end(ctx);
